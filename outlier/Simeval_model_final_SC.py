@@ -50,53 +50,53 @@ def plot_history(model_history, model_name):
 # In[ ]:
 
 
-# Define the cross-validator object for regression, which inherits from 
+# Define the cross-validator object for regression, which inherits from
 # StratifiedKFold, overwritting the split method
 #code source: https://colab.research.google.com/drive/1KnXujsQDvLZOgCRg_iis036cwffwZM2_?usp=sharing#scrollTo=2q_q9w8Jpmwd
 # &https://github.com/scikit-learn/scikit-learn/issues/4757
 
 class StratifiedKFoldReg(StratifiedKFold):
-    
+
     """
-    
+
     This class generate cross-validation partitions
     for regression setups, such that these partitions
-    resemble the original sample distribution of the 
+    resemble the original sample distribution of the
     target variable.
-    
+
     """
-    
+
     def split(self, X, y, groups=None):
-        
+
         n_samples = len(y)
-        
+
         # Number of labels to discretize our target variable,
         # into bins of quasi equal size
         n_labels = int(np.round(n_samples/self.n_splits))
-        
+
         # Assign a label to each bin of n_splits points
         y_labels_sorted = np.concatenate([np.repeat(ii, self.n_splits)             for ii in range(n_labels)])
-        
+
         # Get number of points that would fall
         # out of the equally-sized bins
         mod = np.mod(n_samples, self.n_splits)
-        
+
         # Find unique idxs of first unique label's ocurrence
         _, labels_idx = np.unique(y_labels_sorted, return_index=True)
-        
-        # sample randomly the label idxs to which assign the 
+
+        # sample randomly the label idxs to which assign the
         # the mod points
         rand_label_ix = np.random.choice(labels_idx, mod, replace=False)
 
         # insert these at the beginning of the corresponding bin
         y_labels_sorted = np.insert(y_labels_sorted, rand_label_ix, y_labels_sorted[rand_label_ix])
-        
-        # find each element of y to which label corresponds in the sorted 
+
+        # find each element of y to which label corresponds in the sorted
         # array of labels
         map_labels_y = dict()
         for ix, label in zip(np.argsort(y), y_labels_sorted):
             map_labels_y[ix] = label
-    
+
         # put labels according to the given y order then
         y_labels = np.array([map_labels_y[ii] for ii in range(n_samples)])
 
@@ -125,9 +125,9 @@ y = x.pop('residual')
 
 
 # normalization
-scaler = StandardScaler().fit(x)
-X = scaler.transform(x)
-
+# scaler = StandardScaler().fit(x)
+# X = scaler.transform(x)
+X = x.values        # Normalization is built into model now
 
 # In[ ]:
 
@@ -155,7 +155,10 @@ for ii, (train_index, test_index) in enumerate(cv_stratified.split(X, y)):
 
   #Define and summarize the model
   inps = layers.Input(shape=X_train[0].shape)
-  x = layers.Dense(48, activation='relu')(inps)
+  norm_layer = layers.Normalization(axis=1)
+  norm_layer.adapt(X_train)
+  x = norm_layer(inps)
+  x = layers.Dense(48, activation='relu')(x)
   x = layers.Dense(24, activation='relu')(x)
   x = layers.Dense(12, activation='relu')(x)
   x = layers.Dropout(0.2)(x)
@@ -165,7 +168,7 @@ for ii, (train_index, test_index) in enumerate(cv_stratified.split(X, y)):
   #Compile the model
   lr = 0.00007
   ANN5.compile(optimizer=optimizers.RMSprop(lr=lr), loss='mse')
-    
+
   # Generate a print
   print('------------------------------------------------------------------------')
   print(f'Training for fold {fold_no} ...')
@@ -176,7 +179,7 @@ for ii, (train_index, test_index) in enumerate(cv_stratified.split(X, y)):
 
   #print histogram of y_test and y_train
   fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(5, 5))
-  
+
   axs.hist(y_train, label="training")
   axs.hist(y_test, label="test")
   axs.legend()
@@ -186,7 +189,7 @@ for ii, (train_index, test_index) in enumerate(cv_stratified.split(X, y)):
   history = ANN5.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=200, verbose=0)
   plot_history(history, 'ANN5')
 
-  
+
   #to store values for plotting global predicted vs. true residual values
   test_predictions = ANN5.predict(X_test).flatten()
   predcited_y = np.append(predcited_y, test_predictions)
@@ -194,7 +197,7 @@ for ii, (train_index, test_index) in enumerate(cv_stratified.split(X, y)):
   y_test_array = y_test.values
   true_y = np.append(true_y, y_test_array)
 
-    
+
   # Generate generalization metrics
   scores = ANN5.evaluate(X_test, y_test, verbose=0)
   print(f'Test Score for fold {fold_no}: {ANN5.metrics_names} of {scores}')
@@ -470,7 +473,7 @@ plt.xlabel('False Positive Rate')
 plt.show()
 
 
-    
+
 
 
 # In[ ]:
@@ -574,8 +577,8 @@ for ii, (train_index, test_index) in enumerate(cv_stratified.split(X, y)):
   #Compile the model
   lr = 0.00007
   ANN5.compile(optimizer=optimizers.RMSprop(lr=lr), loss='mse')
-    
-     
+
+
   # Generate a print
   print('------------------------------------------------------------------------')
   print(f'Training for fold {fold_no} ...')
@@ -586,7 +589,7 @@ for ii, (train_index, test_index) in enumerate(cv_stratified.split(X, y)):
 
   #print histogram of y_test and y_train
   fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(5, 5))
-  
+
   axs.hist(y_train, label="training")
   axs.hist(y_test, label="test")
   axs.legend()
@@ -596,7 +599,7 @@ for ii, (train_index, test_index) in enumerate(cv_stratified.split(X, y)):
   history = ANN5.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=200, verbose=0)
   plot_history(history, 'ANN5')
 
-  
+
   #to store values for plotting global predicted vs. true residual values
   test_predictions = ANN5.predict(X_test).flatten()
   predcited_y = np.append(predcited_y, test_predictions)
@@ -604,7 +607,7 @@ for ii, (train_index, test_index) in enumerate(cv_stratified.split(X, y)):
   y_test_array = y_test.values
   true_y = np.append(true_y, y_test_array)
 
-    
+
   # Generate generalization metrics
   scores = ANN5.evaluate(X_test, y_test, verbose=0)
   print(f'Test Score for fold {fold_no}: {ANN5.metrics_names} of {scores}')
