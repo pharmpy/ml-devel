@@ -35,9 +35,8 @@ import tflite_runtime.interpreter as tflite
 
 # In[Generate test data]:
 #import the dataset
-raw_dataset1 = pd.read_csv('C:/Users/simca176/Documents/ML_CDD_simeval/CDD/Merged_datasets_cdd.csv')
+raw_dataset1 = pd.read_csv('C:/Users/<path>/Documents/ML_CDD_simeval/CDD/Merged_datasets_cdd.csv')
 
-# log the OFV ratio as range goes from 2e-3 to 2e7
 true_labels = raw_dataset1.pop('dofv')
 
 rawdat1 = raw_dataset1.copy()
@@ -57,7 +56,7 @@ rawdat2 = rawdat2.astype(np.float32)
 input_data = rawdat2 
     
 def predict_outliers(model): 
-    interpreter = tf.lite.Interpreter(model_path='C:/Users/simca176/Documents/ML_CDD_simeval/ml-devel/infl_indiv/SC_testing/infl_test.tflite')
+    interpreter = tf.lite.Interpreter(model_path='C:/Users/<path>/Documents/ML_CDD_simeval/ml-devel/infl_indiv/SC_testing/infl_test.tflite')
     interpreter.allocate_tensors()
 
     input_details = interpreter.get_input_details()
