@@ -1,0 +1,198 @@
+---
+title: "Untitled"
+author: "TIANWU YANG"
+date: "7/15/2021"
+output: html_document
+---
+
+```{r}
+my_path <- "~/Cluster/Savic-RM-2007-Moxonidine" # change the wd
+setwd(my_path) 
+
+my_file <- "run207b_linbase.mod"               #Change the run
+path <- paste0(my_path,"/",my_file)
+
+```
+
+```{r}
+library(pharmr)
+library(readr)
+library(dplyr)
+```
+
+```{r}
+model <- read_model(path)      
+results <- model$modelfit_results
+ID <- unique(model$dataset$ID)
+```
+
+```{r}
+# Check how many subjects
+number_of_subjects <- ninds(model)
+number_of_observations <- nobs(model)
+number_of_observations_for_each <- nobsi(model)
+```
+
+```{r}
+#1st: #obsi/(#obs/#subj) 
+avg_nobs <- number_of_observations/number_of_subjects         # avg number of observations
+nobsi_over_avg <- number_of_observations_for_each/avg_nobs    # #obsi/(#obs/#subj)
+nobsi_over_avg
+```
+
+
+```{r}
+# These two predictors need to check manually   !!!!!!!!!!!!!!!
+# The code for these two predictors are just for reference, you need to change according to your model covariates
+
+
+#Covariate-relations 
+model$covariates
+cov_relations <- length(model$covariates) 
+
+#Max|(covariate valuei-(mean(covariate value))|/SD(covariate value)
+cov_table <- data.frame( "ID" = model$dataset$ID,
+                         "WT" = model$dataset$WT)   # change and add your covariate names  !!!!!!
+cov_table <- distinct(cov_table)                # to keep the first row only for each
+
+cov_table_alt <- subset(cov_table, select = -c(ID))   # Variable to store calculated values
+
+
+for (n in 1:ncol(cov_table_alt)){
+  cov_mean <- mean(cov_table_alt[,n], na.rm = TRUE)
+  cov_sd <- sd(cov_table_alt[,n], na.rm = TRUE)
+  cov_table_alt[n] <- abs(cov_table_alt[n] - cov_mean)/cov_sd   
+}
+
+  
+max_cov_over_sd <- NULL
+for (i in (1:length(ID))) {
+  max_cov_over_sd <- c(max_cov_over_sd, max(as.matrix(cov_table_alt[i, ])))
+}
+
+max_cov_over_sd 
+```
+
+```{r}
+# These two predictors need to check manually   !!!!!!!!!!!!!!!
+# The code for these two predictors are just for reference, you need to change according to your model covariates
+
+
+#Covariate-relations 
+model$covariates
+cov_relations <- 0
+
+#Max|(covariate valuei-(mean(covariate value))|/SD(covariate value)
+cov_table <- data.frame( "ID" = model$dataset$ID,
+                        "WGT" = model$dataset$WGT)
+cov_table <- distinct(cov_table)                # to keep the first row only for each
+
+for (n in 2:ncol(cov_table)){
+  cov_mean <- mean(cov_table[,n], na.rm = TRUE)
+  cov_sd <- sd(cov_table[,n], na.rm = TRUE)
+  cov_table[n] <- abs(cov_table[n] - cov_mean)/cov_sd   
+}
+
+  
+max_cov_over_sd <- NULL
+for (i in ID) {
+  pre_data_4 <- cov_table[cov_table$ID == i, ]
+  pre_data_4 <- subset(pre_data_4, select = -c(ID))
+  pre_data_4 <- as.matrix(pre_data_4)
+  max_cov_over_sd <- c(max_cov_over_sd, max(pre_data_4))
+}
+
+max_cov_over_sd 
+```
+
+
+```{r}
+# CWRES
+CWRES_all <- reset_index(results$residuals)
+CWRES_all <- CWRES_all[CWRES_all$CWRES != 0, ] 
+CWRES_each_max <- NULL
+CWRES_each_median <- NULL
+ID <- unique(CWRES_all$ID)
+
+for (i in ID) {
+  CWRES_eachi_all_abs <- abs(CWRES_all$CWRES [CWRES_all$ID == i])
+  CWRES_each_max <- c(CWRES_each_max, max(CWRES_eachi_all_abs))
+  CWRES_each_median <- c(CWRES_each_median, median(CWRES_eachi_all_abs))
+}     
+
+CWRES_each_max
+CWRES_each_median
+```
+
+```{r}
+# Max(|EBEij|/omegaj)
+est_ind <-  results$individual_estimates    # Save individual estimates as variable
+rvs <- model$random_variables               # Save random variables as variable
+est_param <- results$parameter_estimates    # Save parameter estimates as variable
+EBE_i_alt <- results$individual_estimates   # Variable to store calculated values
+
+for (n in 1:ncol(est_ind)) {
+  eta_name <- colnames(est_ind)[n]                  # Get eta name of current column
+  omega <- rvs$get_variance(eta_name)               # Find omega name
+  omega_est <- est_param[omega$name]                # Extract estimated omega value
+  EBE_i_alt[n] <- abs(est_ind[n])/sqrt(omega_est)   # Calculate predictor
+}
+
+max_EBE_over_omega_each <- NULL
+for (i in (1:length(ID))) {
+  max_EBE_over_omega_each <- c(max_EBE_over_omega_each, max(as.matrix(EBE_i_alt[i, ])))
+}
+max_EBE_over_omega_each
+```
+
+```{r}
+# Exp(OFVi/#Obsi) /Exp(OFV/#Obs)
+
+ofvi <- results$individual_ofv
+ofv <- results$ofv
+
+OFVRatio <- exp(ofvi/number_of_observations_for_each)/exp(ofv/number_of_observations)
+OFVRatio
+```
+
+
+
+```{r}
+# Mean(ETCij/OMEGAj)i
+mean_ETC_omega <- NULL
+for (i in 1:ninds(model)) {
+  ind_i_cov_est <- results$individual_estimates_covariance[[i]] # To get the estimate for individual n
+  ind_i_cov_df <- as.data.frame(ind_i_cov_est$values)           # To save estimates as matrix
+  ETC_over_omega <- NULL
+  for (n in 1:ncol(ind_i_cov_df)) {
+    ETC_value <- ind_i_cov_df[n,n]                               # To get covariance between named etas 
+    eta_name <- colnames(est_ind)[n]                             # Get eta name of current column
+    omega <- rvs$get_variance(eta_name)                          # Find omega name
+    omega_est <- est_param[omega$name]                           # Extract estimated omega value
+    ETC_over_omega[n] <- sqrt(ETC_value)/sqrt(omega_est)         # calculate ETC/omega for each ETC in ind i
+  }
+  mean_ETC_omega[i] <- mean(ETC_over_omega)
+}
+mean_ETC_omega
+```
+
+```{r}
+# Linearized model(0 is non linear and 1 is linear)
+lin_model <- # (0 is non linear and 1 is linear)
+
+# Write out
+predictors_data <- data.frame(Subject = number_of_subjects,
+                              Observations = number_of_observations,
+                              Obsi_Obs_Subj = nobsi_over_avg,
+                              Covariate_relations = cov_relations,
+                              Max_cov = max_cov_over_sd,
+                              Max_CWRESi = CWRES_each_max,
+                              Median_CWRESi = CWRES_each_median,
+                              Max_EBEij_omegaj = max_EBE_over_omega_each,
+                              OFVRatio = OFVRatio,
+                              mean_ETC_omega = mean_ETC_omega,
+                              lin_model = lin_model)
+
+write_csv(x = predictors_data, file = "change the file name you want")
+```
+

@@ -39,7 +39,8 @@ print(tf.__version__)
 # StratifiedKFold, overwritting the split method
 #code source: https://colab.research.google.com/drive/1KnXujsQDvLZOgCRg_iis036cwffwZM2_?usp=sharing#scrollTo=2q_q9w8Jpmwd
 # &https://github.com/scikit-learn/scikit-learn/issues/4757
-
+random_seed=4242
+random.set_seed = random_seed
 class StratifiedKFoldReg(StratifiedKFold):
 
     """
@@ -88,91 +89,108 @@ class StratifiedKFoldReg(StratifiedKFold):
         return super().split(X, y_labels, groups)
 
 
-# In[Load dataset]:
+# In[Import dataset]:
 
 
 #load data
-raw_dataset = pd.read_csv('path/merged_datasets_for_simeval.csv')
+raw_dataset = pd.read_csv('merged_datasets_for_simeval.csv')
 dataset = raw_dataset.copy()
 dataset.drop(['dofv', 'ID', 'Study_ID', 'Model_number', 'lin_model'], axis = 1, inplace=True)
 dataset.head()
 
 #split features and labels
 x = dataset.copy()
-y = x.pop('residual')
+Y = x.pop('residual')
 X = x.values
 
-# In[Train Model ]:
+# In[Create 3 layer ANN model]:
 
-#ANN5: This is the final model
-# number of splits/folds
-n_splits = 10                #number of folds
+layer = tf.keras.layers.Normalization(axis=1)
+layer.adapt(X)
+
+def create_model():
+    model = tf.keras.models.Sequential([
+    tf.keras.layers.Input(shape=X.shape), 
+    layer,
+    tf.keras.layers.Dense(48, activation='relu'),
+    tf.keras.layers.Dense(24, activation='relu'),
+    tf.keras.layers.Dense(12, activation='relu'),
+    tf.keras.layers.Dropout(0.2),
+    tf.keras.layers.Dense(1)
+  ])
+
+    model.compile(optimizer=optimizers.RMSprop(learning_rate=0.00007), loss='mse')
+    return model
+
+# Create a basic model instance
+model = create_model()
+
+# Display the model's architecture
+model.summary()
+
+# In[Run Kfold Cross validation ]:
+
+
+# Set up empty vectors for outputs
 loss_per_fold = []           #to store test loss value in each fold
 Train_loss_per_fold = []     #to store training loss value in each fold
 predicted_y = np.array([])   #to store predicted residual value from each CV fold
-predicted_prob = np.array([])
 true_y = np.array([])        #to store true residual value from each CV fold
-lr = 0.00007
 
-# cross validated stratification
-cv_stratified = StratifiedKFoldReg(n_splits=n_splits, shuffle=True, random_state=10)   
+num_folds = 10   
+
+# cross validated stratification to keep ratios same across each split
+cv_stratified = StratifiedKFoldReg(n_splits=num_folds, shuffle=True, random_state=10)   
 
 fold_no = 1
-for ii, (train_index, test_index) in enumerate(cv_stratified.split(X, y)):
-    y_train, y_test = y[train_index], y[test_index]
+for ii, (train_index, test_index) in enumerate(cv_stratified.split(X, Y)):
+    Y_train, Y_test = Y[train_index], Y[test_index]
     X_train, X_test = X[train_index], X[test_index]
 
-    #Define and summarize the model
-    inps = layers.Input(shape=X_train[0].shape, dtype='float32')
-    norm_layer = layers.Normalization(axis=1)
-    norm_layer.adapt(X_train)
-    x = norm_layer(inps)
-    x = layers.Dense(48, activation='relu')(x)
-    x = layers.Dense(24, activation='relu')(x)
-    x = layers.Dense(12, activation='relu')(x)
-    x = layers.Dropout(0.2)(x)
-    preds = layers.Dense(1)(x)
-    #pred_prob = layers.Dense(1, activation = 'softmax')(x)
-    #ANN5 = models.Model(inputs=inps, outputs=(preds, pred_prob))
-    ANN5 = models.Model(inputs=inps, outputs=preds)
+    # Fit data to model
+    history = model.fit(X_train, Y_train, validation_data=(X_test, Y_test), epochs=200, verbose=0)
+            
+    #to store values for plotting global predicted vs. true residual values
+    test_predictions = model.predict(X_test).flatten()
+    predicted_y = np.append(predicted_y, test_predictions)
+        
+    y_test_array = Y_test.values
+    true_y = np.append(true_y, y_test_array)  
+         
+    # Print fold_no during training
+    print('------------------------------------------------------------------------')
+    print(f'Training for fold {fold_no} ...')
+    print('------------------------------------------------------------------------')
+    
+    # Generate generalization metrics
+    scores = model.evaluate(X_test, Y_test, verbose=0)
+    print(f'Score for fold {fold_no}: {model.metrics_names} of {scores}')
+    scores_training = model.evaluate(X_train, Y_train, verbose=0)
+    print(f'Training Score for fold {fold_no}: {model.metrics_names} of {scores_training}')
+    loss_per_fold.append(scores)
+    Train_loss_per_fold.append(scores_training)    
 
-    #Compile the model
-    ANN5.compile(optimizer=optimizers.RMSprop(learning_rate=lr),loss='mse')
-
+  
     # Generate a print
     print('------------------------------------------------------------------------')
     print(f'Training for fold {fold_no} ...')
 
-    test_labels = y_test.to_list()
+    test_labels = Y_test.to_list()
     test_labels = [round(num, 2) for num in test_labels]
     print(test_labels)   #to have a look at the true residual values for test dataset
-
-    # Fit data to model
-    history = ANN5.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=200, verbose=0)
-  
-    #to store values for plotting global predicted vs. true residual values
-    test_predictions = ANN5.predict(X_test).flatten()
-    predicted_y = np.append(predicted_y, test_predictions)
-
-    #test_prob = ANN5.predict(X_test('pred_prob')).flatten()
-    #predicted_prob = np.append(predicted_prob, test_predictions('pred_prob'))
-    
-    y_test_array = y_test.values
-    true_y = np.append(true_y, y_test_array)
-
-    # Generate generalization metrics
-    scores = ANN5.evaluate(X_test, y_test, verbose=0)
-    print(f'Test Score for fold {fold_no}: {ANN5.metrics_names} of {scores}')
-
-    scores_training = ANN5.evaluate(X_train, y_train, verbose=0)
-    print(f'Training Score for fold {fold_no}: {ANN5.metrics_names} of {scores_training}')
-
-    loss_per_fold.append(scores)
-    Train_loss_per_fold.append(scores_training)
 
     # Increase fold number
     fold_no = fold_no + 1
 
+# In[Summarise output]:
+
+print('----------------------- Influential Individual Summary ---------------------------------------')
+print('4 hidden layers (Nodes: 64, 32, 24, 12)')
+print(f'learning rate: 0.00007, number of epochs: 200')
+print(f'Average scores for all {fold_no} folds:')
+print(f'Testing Loss: {np.mean(loss_per_fold): 0.4f} ({min(loss_per_fold):0.4f}-{max(loss_per_fold):0.4f})')
+print(f'Training Loss: {np.mean(Train_loss_per_fold): 0.4f} ({min(Train_loss_per_fold):0.4f}-{max(Train_loss_per_fold):0.4f})')
+print('----------------------------------------------------------------------------------------------')
 
 # In[Plot prediction]:
     
@@ -185,6 +203,20 @@ for ii, (train_index, test_index) in enumerate(cv_stratified.split(X, y)):
 # plt.ylim(lims)
 # prediction_plot = plt.plot(lims, lims)
 
+# In[permutation importance]:
+feature_name = ['Model_subjects', 'Model_observations',
+                'Obsi_Obs_Subj', 'Covariate_relations', 'Max_cov', 'Max_CWRESi', 'Median_CWRESi',
+                'Max_EBEij_omegaj', 'OFVRatio', 'mean_ETC_omega']
+
+r = permutation_importance(model, X, y,
+                            n_repeats=30,
+                            random_state=0, scoring='neg_mean_squared_error')
+
+for i in r.importances_mean.argsort()[::-1]:
+      if r.importances_mean[i] - 2 * r.importances_std[i] > 0:
+          print(f"{feature_name[i]:<10}"
+                f"{r.importances_mean[i]:.3f}"
+                f" +/- {r.importances_std[i]:.3f}")
 
 # In[Save model and convert to tflite]:
 # Save model and convert to tflite
@@ -197,23 +229,21 @@ for ii, (train_index, test_index) in enumerate(cv_stratified.split(X, y)):
 #     f.write(tflite_model)
 
 # convert directly
-tflite_model = tf.lite.TFLiteConverter.from_keras_model(ANN5).convert()
+tflite_model = tf.lite.TFLiteConverter.from_keras_model(model).convert()
 
-with open('path/ML_CDD_simeval/ml-devel/outlier/outliers.tflite', 'wb') as f:
+with open('path/ML_CDD_simeval/ml-devel/outlier/outliers_test.tflite', 'wb') as f:
     f.write(tflite_model)   
     
 # In[Test tensorflow model]:
-ANN5.save('path/ML_CDD_simeval/outlier' )    
+model.save('ml-devel/outlier/SC_testing' )    
 
 #%%
 # read in tensorflow model and test
-new_model = tf.keras.models.load_model('path/ML_CDD_simeval/outlier')
+new_model = tf.keras.models.load_model('ml-devel/outlier/SC_testing')
+new_model.summary()
 
 #%%
-# test on data
-
-#%%
-raw_data = pd.read_csv('path/merged_datasets_for_simeval.csv')
+raw_data = pd.read_csv('merged_datasets_for_simeval.csv')
 rawdat1 = raw_data.copy()
 is_test1 = rawdat1['Model_number']=='PRZrun4'
 rawdat1 = rawdat1[is_test1]
@@ -304,101 +334,4 @@ print(test1)
 
 
 
-# In[ ]:
-
-
-# # == Provide average scores ==
-# print('------------------------------------------------------------------------')
-# print('Score per fold')
-# for i in range(0, len(loss_per_fold)):
-#   print('------------------------------------------------------------------------')
-#   print(f'> Fold {i+1} - Training Loss: {Train_loss_per_fold[i]} - Testing Loss: {loss_per_fold[i]} -')
-# print('------------------------------------------------------------------------')
-# print('Average scores for all folds:')
-# print(f'> Test Loss: {np.mean(loss_per_fold)}')
-# print(f'> Training Loss: {np.mean(Train_loss_per_fold)}')
-# print('------------------------------------------------------------------------')
-
-
-# In[ ]:
-
-
-# #permutation importance
-# feature_name = ['Model_subjects', 'Model_observations',
-#                 'Obsi_Obs_Subj', 'Covariate_relations', 'Max_cov', 'Max_CWRESi', 'Median_CWRESi',
-#                 'Max_EBEij_omegaj', 'OFVRatio', 'mean_ETC_omega']
-
-# r = permutation_importance(ANN5, X, y,
-#                             n_repeats=30,
-#                             random_state=0, scoring='neg_mean_squared_error')
-
-# for i in r.importances_mean.argsort()[::-1]:
-#      if r.importances_mean[i] - 2 * r.importances_std[i] > 0:
-#          print(f"{feature_name[i]:<10}"
-#                f"{r.importances_mean[i]:.3f}"
-#                f" +/- {r.importances_std[i]:.3f}")
-
-
-# # In[ ]:
-
-
-# #sensitivity analysis: cut-off=3 for both true and predicted residual
-# true_positives = 0
-# false_positives = 0
-# true_negative = 0
-# false_negative = 0
-# for i in range(0,len(true_y)):
-#     if abs(true_y[i]) > 3 and abs(predcited_y[i]) > 3:
-#         true_positives = true_positives + 1
-#     if abs(true_y[i]) <= 3 and abs(predcited_y[i]) > 3:
-#         false_positives = false_positives + 1
-#     if abs(true_y[i]) <= 3 and abs(predcited_y[i]) <= 3:
-#         true_negative = true_negative + 1
-#     if abs(true_y[i]) > 3 and abs(predcited_y[i]) <= 3:
-#         false_negative = false_negative + 1
-
-# print(f'> TP: {true_positives}')
-# print(f'> FP: {false_positives}')
-# print(f'> TN: {true_negative}')
-# print(f'> FN: {false_negative}')
-
-# sensitivity = true_positives/(true_positives + false_negative)
-# specificity = true_negative/(true_negative + false_positives)
-# precision = true_positives/(true_positives + false_positives)
-
-# print(f'> Sensitivity: {round(sensitivity, 3)}')
-# print(f'> Specificity: {round(specificity, 3)}')
-# print(f'> Precision: {round(precision, 3)}')
-
-
-# In[ ]:
-
-
-# #sensitivity analysis: cut-off=3 for true and 2.5 for predicted residual
-# true_positives = 0
-# false_positives = 0
-# true_negative = 0
-# false_negative = 0
-# for i in range(0,len(true_y)):
-#     if abs(true_y[i]) > 3 and abs(predcited_y[i]) > 2.5:
-#         true_positives = true_positives+1
-#     if abs(true_y[i]) <= 3 and abs(predcited_y[i]) > 2.5:
-#         false_positives = false_positives + 1
-#     if abs(true_y[i]) <= 3 and abs(predcited_y[i]) <= 2.5:
-#         true_negative = true_negative+1
-#     if abs(true_y[i]) > 3 and abs(predcited_y[i]) <= 2.5:
-#         false_negative = false_negative + 1
-
-# print(f'> TP: {true_positives}')
-# print(f'> FP: {false_positives}')
-# print(f'> TN: {true_negative}')
-# print(f'> FN: {false_negative}')
-
-# sensitivity = true_positives/(true_positives + false_negative)
-# specificity = true_negative/(true_negative + false_positives)
-# precision = true_positives/(true_positives + false_positives)
-
-# print(f'> Sensitivity: {round(sensitivity, 3)}')
-# print(f'> Specificity: {round(specificity, 3)}')
-# print(f'> Precision: {round(precision, 3)}')
 

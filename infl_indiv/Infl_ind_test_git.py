@@ -102,7 +102,7 @@ class StratifiedKFoldReg(StratifiedKFold):
 
 
 #import the dataset
-raw_dataset = pd.read_csv('C:/Users/<path>/Documents/ML_CDD_simeval/CDD/Merged_datasets_cdd.csv')
+raw_dataset = pd.read_csv('Merged_datasets_cdd.csv')
 print(raw_dataset.describe())
 X_all = raw_dataset.copy()
 #X_all.reset_index(drop=True)
@@ -209,29 +209,45 @@ print(f'Testing Loss: {np.mean(loss_per_fold): 0.4f} ({min(loss_per_fold):0.4f}-
 print(f'Training Loss: {np.mean(Train_loss_per_fold): 0.4f} ({min(Train_loss_per_fold):0.4f}-{max(Train_loss_per_fold):0.4f})')
 print('----------------------------------------------------------------------------------------------')
 
+# In[Permutation Importance]:
+
+feature_name = ['Model_subjects', 'Model_observations',
+                'Obsi_Obs_Subj', 'Covariate_relations', 'Max_cov', 'Max_CWRESi', 'Median_CWRESi',
+                'Max_EBEij_omegaj', 'OFVRatio', 'mean_ETC_omega']
+
+r = permutation_importance(model, X, Y,
+                            n_repeats=30,
+                            random_state=0, scoring='neg_mean_squared_error')
+
+for i in r.importances_mean.argsort()[::-1]:
+      if r.importances_mean[i] - 2 * r.importances_std[i] > 0:
+          print(f"{feature_name[i]:<10}"
+                f"{r.importances_mean[i]:.3f}"
+                f" +/- {r.importances_std[i]:.3f}")
+
 
 # In[Save Model]:
 
 # save model
-model.save('C:/Users/<path>/Documents/ML_CDD_simeval/ml-devel/infl_indiv/SC_testing')
+model.save('ml-devel/infl_indiv/SC_testing')
 
 # convert to tflite for pharmpy testing
-tflite_model = tf.lite.TFLiteConverter.from_saved_model('C:/Users/<path>/Documents/ML_CDD_simeval/ml-devel/infl_indiv/SC_testing').convert()
-with open('C:/Users/<path>/Documents/ML_CDD_simeval/ml-devel/infl_indiv/SC_testing/infl_test.tflite', 'wb') as f:
+tflite_model = tf.lite.TFLiteConverter.from_saved_model('ml-devel/infl_indiv/SC_testing').convert()
+with open('ml-devel/infl_indiv/SC_testing/infl_test.tflite', 'wb') as f:
     f.write(tflite_model)
 
 # In[Remove variables then load model for testing]:
 
 
 # test on dataset
-new_model = tf.keras.models.load_model('C:/Users/<path>/Documents/ML_CDD_simeval/ml-devel/infl_indiv/SC_testing')
+new_model = tf.keras.models.load_model('ml-devel/infl_indiv/SC_testing')
 new_model.summary()
 
 
 # In[Test tensorflow model]:
 
 #import the dataset
-raw_dataset1 = pd.read_csv('C:/Users/<path>/Documents/ML_CDD_simeval/CDD/Merged_datasets_cdd.csv')
+raw_dataset1 = pd.read_csv('Merged_datasets_cdd.csv')
 
 # log the OFV ratio as range goes from 2e-3 to 2e7
 true_labels = raw_dataset1.pop('dofv')
