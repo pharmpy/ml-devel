@@ -35,7 +35,7 @@ import tflite_runtime.interpreter as tflite
 
 
 # In[Generate test data]:
-raw_data = pd.read_csv('c:/Users/simca176/.spyder-py3/merged_datasets_for_simeval.csv')
+raw_data = pd.read_csv('merged_datasets_for_simeval.csv')
 
 
 rawdat1 = raw_data.copy()
@@ -71,7 +71,7 @@ input_data = rawdat2
 output = np.empty(len(input_data))
 output = output.astype(np.float32)
 
-model_path='c:/users/simca176/Documents/ML_CDD_simeval/ml-devel/outlier/outliers.tflite'
+model_path='ml-devel/outlier/outliers.tflite'
 # interpreter.allocate_tensors()
 
 # input_details = interpreter.get_input_details()
