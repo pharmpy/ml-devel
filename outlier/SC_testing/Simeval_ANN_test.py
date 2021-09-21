@@ -92,7 +92,7 @@ class StratifiedKFoldReg(StratifiedKFold):
 
 
 #load data
-raw_dataset = pd.read_csv('c:/Users/simca176/.spyder-py3/merged_datasets_for_simeval.csv')
+raw_dataset = pd.read_csv('path/merged_datasets_for_simeval.csv')
 dataset = raw_dataset.copy()
 dataset.drop(['dofv', 'ID', 'Study_ID', 'Model_number', 'lin_model'], axis = 1, inplace=True)
 dataset.head()
@@ -189,31 +189,31 @@ for ii, (train_index, test_index) in enumerate(cv_stratified.split(X, y)):
 # In[Save model and convert to tflite]:
 # Save model and convert to tflite
 
-# tf.saved_model.save(ANN5,'c:/users/simca176/Documents/ML_CDD_simeval/ml-devel/outlier')
+# tf.saved_model.save(ANN5,'path/ML_CDD_simeval/ml-devel/outlier')
 
-# tflite_model = tf.lite.TFLiteConverter.from_saved_model('c:/users/simca176/Documents/ML_CDD_simeval/ml-devel/outlier').convert()
+# tflite_model = tf.lite.TFLiteConverter.from_saved_model('path/ML_CDD_simeval/ml-devel/outlier').convert()
 
-# with open('c:/users/simca176/Documents/ML_CDD_simeval/ml-devel/outlier/outliers.tflite', 'wb') as f:
+# with open('path/ML_CDD_simeval/ml-devel/outlier/outliers.tflite', 'wb') as f:
 #     f.write(tflite_model)
 
 # convert directly
 tflite_model = tf.lite.TFLiteConverter.from_keras_model(ANN5).convert()
 
-with open('c:/users/simca176/Documents/ML_CDD_simeval/ml-devel/outlier/outliers.tflite', 'wb') as f:
+with open('path/ML_CDD_simeval/ml-devel/outlier/outliers.tflite', 'wb') as f:
     f.write(tflite_model)   
     
 # In[Test tensorflow model]:
-ANN5.save('c:/users/simca176/Documents/ML_CDD_simeval/outlier' )    
+ANN5.save('path/ML_CDD_simeval/outlier' )    
 
 #%%
 # read in tensorflow model and test
-new_model = tf.keras.models.load_model('c:/users/simca176/Documents/ML_CDD_simeval/outlier')
+new_model = tf.keras.models.load_model('path/ML_CDD_simeval/outlier')
 
 #%%
 # test on data
 
 #%%
-raw_data = pd.read_csv('c:/Users/simca176/.spyder-py3/merged_datasets_for_simeval.csv')
+raw_data = pd.read_csv('path/merged_datasets_for_simeval.csv')
 rawdat1 = raw_data.copy()
 is_test1 = rawdat1['Model_number']=='PRZrun4'
 rawdat1 = rawdat1[is_test1]
@@ -245,7 +245,7 @@ print(test1)
 #         return JSONEncoder.default(self, obj)
 
 # # load trained outlier model
-# model = tf.keras.models.load_model('c:/users/simca176/Documents/ML_CDD_simeval/outlier')
+# model = tf.keras.models.load_model('path/ML_CDD_simeval/outlier')
 
 # # set up empty arrays
 # out_conf = ()
