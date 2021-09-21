@@ -102,7 +102,7 @@ class StratifiedKFoldReg(StratifiedKFold):
 
 
 #import the dataset
-raw_dataset = pd.read_csv('C:/Users/simca176/Documents/ML_CDD_simeval/CDD/Merged_datasets_cdd.csv')
+raw_dataset = pd.read_csv('C:/Users/<path>/Documents/ML_CDD_simeval/CDD/Merged_datasets_cdd.csv')
 print(raw_dataset.describe())
 X_all = raw_dataset.copy()
 #X_all.reset_index(drop=True)
@@ -213,25 +213,25 @@ print('-------------------------------------------------------------------------
 # In[Save Model]:
 
 # save model
-model.save('C:/Users/simca176/Documents/ML_CDD_simeval/ml-devel/infl_indiv/SC_testing')
+model.save('C:/Users/<path>/Documents/ML_CDD_simeval/ml-devel/infl_indiv/SC_testing')
 
 # convert to tflite for pharmpy testing
-tflite_model = tf.lite.TFLiteConverter.from_saved_model('C:/Users/simca176/Documents/ML_CDD_simeval/ml-devel/infl_indiv/SC_testing').convert()
-with open('C:/Users/simca176/Documents/ML_CDD_simeval/ml-devel/infl_indiv/SC_testing/infl_test.tflite', 'wb') as f:
+tflite_model = tf.lite.TFLiteConverter.from_saved_model('C:/Users/<path>/Documents/ML_CDD_simeval/ml-devel/infl_indiv/SC_testing').convert()
+with open('C:/Users/<path>/Documents/ML_CDD_simeval/ml-devel/infl_indiv/SC_testing/infl_test.tflite', 'wb') as f:
     f.write(tflite_model)
 
 # In[Remove variables then load model for testing]:
 
 
 # test on dataset
-new_model = tf.keras.models.load_model('C:/Users/simca176/Documents/ML_CDD_simeval/ml-devel/infl_indiv/SC_testing')
+new_model = tf.keras.models.load_model('C:/Users/<path>/Documents/ML_CDD_simeval/ml-devel/infl_indiv/SC_testing')
 new_model.summary()
 
 
 # In[Test tensorflow model]:
 
 #import the dataset
-raw_dataset1 = pd.read_csv('C:/Users/simca176/Documents/ML_CDD_simeval/CDD/Merged_datasets_cdd.csv')
+raw_dataset1 = pd.read_csv('C:/Users/<path>/Documents/ML_CDD_simeval/CDD/Merged_datasets_cdd.csv')
 
 # log the OFV ratio as range goes from 2e-3 to 2e7
 true_labels = raw_dataset1.pop('dofv')
