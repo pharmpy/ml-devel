@@ -9,12 +9,12 @@
 Created on Tue Aug 17 03:02:12 2021
 
 @author: Osama Qutishat
-Modified 09th September 2021 
+Modified 21st September 2021 
 @author: Simon Carter
 """
 
 
-# In[1]:
+# In[Load Packages]:
 
 
 # import the libraries<br>
@@ -41,7 +41,7 @@ np.set_printoptions(precision=3, suppress=True)
 print(tf.__version__)
 
 
-# In[3]:
+# In[Stratified KFold function]:
 
 
 # Define the cross-validator object for regression, which inherits from 
@@ -98,84 +98,53 @@ class StratifiedKFoldReg(StratifiedKFold):
         return super().split(X, y_labels, groups)
 
 
-# In[4]:
+# In[Import dataset]:
 
 
 #import the dataset
 raw_dataset = pd.read_csv('C:/Users/simca176/Documents/ML_CDD_simeval/CDD/Merged_datasets_cdd.csv')
 print(raw_dataset.describe())
 X_all = raw_dataset.copy()
-
+#X_all.reset_index(drop=True)
 # log the OFV ratio as range goes from 2e-3 to 2e7
-X_all['logOFVratio'] = np.log(X_all.pop('OFVRatio'))
-X_all.drop(['ID','Study_ID', 'Model_number'],  axis=1, inplace=True)
+#X_all['logOFVratio'] = np.log(X_all.pop('OFVRatio'))
+X_all.drop(['ID','Study_ID', 'Model_number','lin_model'],  axis=1, inplace=True)
 #X_all = X_all[X_all['lin_model']== 0]
-x_all = X_all.copy()
+
 # labels for prediction
-Y_all = X_all.pop('dofv')
-#x_all = X_all
-# normalisation
-#scaler = StandardScaler().fit(X_all)
-#x_all = scaler.transform(X_all)
+Y = X_all.pop('dofv')
+X = X_all.values
 
 print(X_all.head)
-# In[5]:
 
 
-# model for cdd prediction
-# inputs = all predictors, targets = what training
-#inputs1 = x_all
-#targets = Y_all
 
+# In[Create 4 layer ANN model]:
 
-# stratified K fold cross validation - for linear see bottom of file
+layer = tf.keras.layers.Normalization(axis=1)
+layer.adapt(X)
 
-# ## streamline code
+def create_model():
+    model = tf.keras.models.Sequential([
+    tf.keras.layers.Input(shape=X.shape), 
+    layer,
+    tf.keras.layers.Dense(64, activation='relu'),
+    tf.keras.layers.Dense(36, activation='relu'),
+    tf.keras.layers.Dense(24, activation='relu'),
+    tf.keras.layers.Dense(12, activation='relu'),
+    tf.keras.layers.Dense(1)
+  ])
 
-# In[6]:
-
-
-lr = 0.00007
-
-num_folds = 10     
-sig_value = 3.84  # significance value for influential individual
-
-# Stratify data to keep ratios same across each split
-StratifiedkFold = StratifiedKFoldReg(n_splits=num_folds, shuffle=True, random_state = random_seed)
-
-model = tf.keras.Sequential()
-model.add(tf.keras.layers.Input(shape=x_all[0].shape))
-model.add(layer = tf.keras.layers.Normalization(axis=1))
-model.add(layer.adapt(x_all))
-model.add(tf.keras.layers.Dense(64, activation='relu'))
-model.add(tf.keras.layers.Dense(36, activation='relu'))
-model.add(tf.keras.layers.Dense(24, activation='relu'))
-model.add(tf.keras.layers.Dense(12, activation='relu'))
-model.add(tf.keras.layers.Dense(1))
-#layer.adapt(x_all)
-
-# def create_model():
-#     model = tf.keras.models.Sequential([
-#     keras.layers.Input(input_shape=x_all[0].shape), 
-#     layer.adapt(),
-#     keras.layers.Dense(64, activation='relu'),
-#     keras.layers.Dense(36, activation='relu'),
-#     keras.layers.Dense(24, activation='relu'),
-#     keras.layers.Dense(12, activation='relu'),
-#     keras.layers.Dense(1)
-#   ])
-
-model.compile(optimizer=optimizers.RMSprop(learning_rate=0.00007), loss='mse')
-    # return model
+    model.compile(optimizer=optimizers.RMSprop(learning_rate=0.00007), loss='mse')
+    return model
 
 # Create a basic model instance
-#model = create_model()
+model = create_model()
 
 # Display the model's architecture
 model.summary()
 
-
-# In[8]:
+# In[Run Kfold Cross validation]:
 
 
 # Set up empty vectors for outputs
@@ -184,36 +153,43 @@ Train_loss_per_fold = []     # to store training loss value in each fold
 predicted_y = np.array([])   # to store predicted residual value from each CV fold
 true_y = np.array([]) 
 
-true_pos = []
-true_neg = []
-false_pos = []
-false_neg = []
-ave_precision = []
+# true_pos = []
+# true_neg = []
+# false_pos = []
+# false_neg = []
+# ave_precision = []
+
+num_folds = 10     
+sig_value = 3.84  # significance value for influential individual
+
+# Stratify data to keep ratios same across each split
+cv_stratified = StratifiedKFoldReg(n_splits=num_folds, shuffle=True, random_state = random_seed)
 
 fold_no = 1
-for train, test in StratifiedkFold.split(X_all, Y_all):
-          
+#for train, test in StratifiedkFold.split(x_all, Y_all):
+for ii, (train_index, test_index) in enumerate(cv_stratified.split(X, Y)):
+    Y_train, Y_test = Y[train_index], Y[test_index]
+    X_train, X_test = X[train_index], X[test_index]          
+  
     # Fit data to model
-    history = model.fit(X_all[train], Y_all[train], validation_data=(X_all[test], Y_all[test]), epochs=200, verbose=0)
-    #plot_history(history, 'ANN1')
+    history = model.fit(X_train, Y_train, validation_data=(X_test, Y_test), epochs=200, verbose=0)
             
     #to store values for plotting global predicted vs. true residual values
-    test_predictions = model.predict(X_all[test]).flatten()
+    test_predictions = model.predict(X_test).flatten()
     predicted_y = np.append(predicted_y, test_predictions)
         
-    y_test_array = Y_all[test].values
+    y_test_array = Y_test.values
     true_y = np.append(true_y, y_test_array)  
          
     # Print fold_no during training
     print('------------------------------------------------------------------------')
     print(f'Training for fold {fold_no} ...')
-    #print('Average precision-recall score (binary): {0:0.2f}'.format(average_precision))
     print('------------------------------------------------------------------------')
     
     # Generate generalization metrics
-    scores = model.evaluate(inputs1[test], targets[test], verbose=0)
+    scores = model.evaluate(X_test, Y_test, verbose=0)
     print(f'Score for fold {fold_no}: {model.metrics_names} of {scores}')
-    scores_training = model.evaluate(inputs1[train], targets[train], verbose=0)
+    scores_training = model.evaluate(X_train, Y_train, verbose=0)
     print(f'Training Score for fold {fold_no}: {model.metrics_names} of {scores_training}')
     loss_per_fold.append(scores)
     Train_loss_per_fold.append(scores_training)
@@ -222,92 +198,53 @@ for train, test in StratifiedkFold.split(X_all, Y_all):
     fold_no = fold_no + 1
 
 
-# In[10]:
+# In[Summarise output]:
 
 
 print('----------------------- Influential Individual Summary ---------------------------------------')
 print('4 hidden layers (Nodes: 64, 32, 24, 12)')
-print(f'learning rate: {lr}, number of epochs: 200')
+print(f'learning rate: 0.00007, number of epochs: 200')
 print(f'Average scores for all {fold_no} folds:')
 print(f'Testing Loss: {np.mean(loss_per_fold): 0.4f} ({min(loss_per_fold):0.4f}-{max(loss_per_fold):0.4f})')
 print(f'Training Loss: {np.mean(Train_loss_per_fold): 0.4f} ({min(Train_loss_per_fold):0.4f}-{max(Train_loss_per_fold):0.4f})')
-print('--------------------------------------------------------------')
+print('----------------------------------------------------------------------------------------------')
 
 
-# In[12]:
-
+# In[Save Model]:
 
 # save model
-model.save('<path>/Documents/CDD/influ_indiv_mods')
+model.save('C:/Users/simca176/Documents/ML_CDD_simeval/ml-devel/infl_indiv/SC_testing')
 
+# convert to tflite for pharmpy testing
+tflite_model = tf.lite.TFLiteConverter.from_saved_model('C:/Users/simca176/Documents/ML_CDD_simeval/ml-devel/infl_indiv/SC_testing').convert()
+with open('C:/Users/simca176/Documents/ML_CDD_simeval/ml-devel/infl_indiv/SC_testing/infl_test.tflite', 'wb') as f:
+    f.write(tflite_model)
 
-# In[13]:
+# In[Remove variables then load model for testing]:
 
 
 # test on dataset
-new_model = tf.keras.models.load_model('<path>/Documents/CDD/influ_indiv_mods')
+new_model = tf.keras.models.load_model('C:/Users/simca176/Documents/ML_CDD_simeval/ml-devel/infl_indiv/SC_testing')
 new_model.summary()
 
 
-# In[29]:
-
+# In[Test tensorflow model]:
 
 #import the dataset
-raw_dataset1 = pd.read_csv('Merged_datasets_cdd.csv')
+raw_dataset1 = pd.read_csv('C:/Users/simca176/Documents/ML_CDD_simeval/CDD/Merged_datasets_cdd.csv')
 
 # log the OFV ratio as range goes from 2e-3 to 2e7
 true_labels = raw_dataset1.pop('dofv')
 
-raw_dataset1.drop(['ID', 'Study_ID', 'Model_number'],  axis=1, inplace=True)
-#X_all = X_all[X_all['lin_model']== 0]
+rawdat1 = raw_dataset1.copy()
+is_test1 = rawdat1['Model_number']=='DMN343'
+rawdat1 = rawdat1[is_test1]
+rawdat1.drop(['ID', 'Study_ID', 'Model_number', 'lin_model'], 
+                 axis = 1, 
+                 inplace = True) 
 
-raw_test1 = scaler.transform(raw_dataset1)
-raw_test1.shape
-print(f'{max(true_labels)}')
-
-
-# In[32]:
-
-
-test1 = pd.DataFrame(new_model.predict(raw_test1))
-
-test1.columns = ['pred_dofv']
-
-
-# In[33]:
-
-
-# global plot true vs. predicted
-a = plt.axes(aspect='equal')
-plt.scatter(x=test1, y=true_labels)
-plt.xlabel('Predictions [dofv]')
-plt.ylabel('True Values [dofv]')
-lims = [0, 15]
-plt.xlim(lims)
-plt.ylim(lims)
-prediction_plot = plt.show(lims, lims)
-
-
-# ## Convert model to tflite for testing
-
-# In[34]:
-
-
-# save current model as saved_model:
-
-tf.saved_model.save(model,'<path>/Documents/CDD/influ_indiv_totflite')
-
-
-# In[35]:
-
-
-tflite_model = tf.lite.TFLiteConverter.from_saved_model('<path>/Documents/CDD/influ_indiv_totflite').convert()
-with open('<path>/Documents/CDD/influ_indiv_totflite/model.tflite', 'wb') as f:
-    f.write(tflite_model)
-
-
-# In[ ]:
-
-
+# test influential individual model   
+test1 = new_model.predict(rawdat1)
+print(test1)
 
 
