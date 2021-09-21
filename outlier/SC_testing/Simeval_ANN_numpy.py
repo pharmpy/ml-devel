@@ -38,7 +38,7 @@ import h5py
 # #config = tf.ConfigProto(allow_soft_placement=True,
 # #                        log_device_placement=True)
 
-# GRAPH_PB_PATH = 'c:/Users/simca176/Documents/ML_CDD_simeval/ml-devel/outlier/saved_model.pb'
+# GRAPH_PB_PATH = 'ml-devel/outlier/saved_model.pb'
 # with tf.Session(config=config) as sess:
 #     print("load graph")
 #     with gfile.FastGFile(GRAPH_PB_PATH, 'rb') as f:
@@ -65,13 +65,13 @@ import h5py
 
 # In[Read in model json file and weights file]:
 
-f = open('c:/Users/simca176/Documents/ML_CDD_simeval/ml-devel/outlier_mod.json',)    
+f = open('ml-devel/outlier_mod.json',)    
 mod = json.load(f)  
 print(mod)
 
 
 #%%
-mod_wt = h5py.File('c:/Users/simca176/Documents/ML_CDD_simeval/ml-devel/outlier_mod_wt.h5') 
+mod_wt = h5py.File('ml-devel/outlier_mod_wt.h5') 
 
 weights = {}
 keys = []
@@ -104,7 +104,7 @@ for key in keys:
 
 # test = read_hdf5(path)
 # In[Generate test data]:
-raw_data = pd.read_csv('c:/Users/simca176/.spyder-py3/merged_datasets_for_simeval.csv')
+raw_data = pd.read_csv('merged_datasets_for_simeval.csv')
 
 
 rawdat1 = raw_data.copy()
